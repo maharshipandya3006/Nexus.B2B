@@ -437,15 +437,19 @@ export default function TransactionView({ params }: { params: Promise<{ id: stri
             >
               <span className={`w-2 h-2 rounded-full shrink-0 ${
                 wsStatus === 'connected' ? 'bg-emerald-500' :
-                wsStatus === 'reconnecting' || wsStatus === 'connecting' ? 'bg-amber-400 animate-pulse' :
+                wsStatus === 'reconnecting' ? 'bg-amber-400 animate-pulse' :
+                wsStatus === 'connecting' ? 'bg-amber-400 animate-pulse' :
                 'bg-slate-300'
               }`} />
               <span className={
                 wsStatus === 'connected' ? 'text-emerald-700 font-semibold' :
-                wsStatus === 'reconnecting' || wsStatus === 'connecting' ? 'text-amber-700 font-medium' :
+                wsStatus === 'reconnecting' ? 'text-amber-700 font-medium' :
+                wsStatus === 'connecting' ? 'text-amber-700 font-medium' :
                 'text-slate-500'
               }>
-                {wsStatus === 'connected' ? 'Live Sync Active' : wsStatus === 'reconnecting' ? 'Reconnecting...' : 'Offline'}
+                {wsStatus === 'connected' ? 'Live Sync Active' :
+                 wsStatus === 'reconnecting' ? 'Reconnecting...' :
+                 wsStatus === 'connecting' ? 'Connecting...' : 'Offline'}
               </span>
             </div>
           </div>
@@ -639,6 +643,11 @@ export default function TransactionView({ params }: { params: Promise<{ id: stri
                       <p className="font-mono text-xs text-slate-500">
                         @ ₹{transaction.final_price.toLocaleString()} / unit
                       </p>
+                      {transaction?.catalog_price && transaction.catalog_price > transaction.final_price && (
+                        <p className="text-[11px] font-mono text-emerald-700 font-semibold mt-1">
+                          Saved ₹{(transaction.catalog_price - transaction.final_price).toLocaleString()}/unit ({(((transaction.catalog_price - transaction.final_price) / transaction.catalog_price) * 100).toFixed(1)}% off list)
+                        </p>
+                      )}
                     </div>
 
                     {currentAgreedQuote && (

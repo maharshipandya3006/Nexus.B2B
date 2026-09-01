@@ -333,11 +333,14 @@ export default function BuyerDashboard() {
               >
                 <span className={`w-2 h-2 rounded-full motion-reduce:animate-none ${
                   wsStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
-                  wsStatus === 'reconnecting' || wsStatus === 'connecting' ? 'bg-amber-400 animate-ping' :
+                  wsStatus === 'reconnecting' ? 'bg-amber-400 animate-ping' :
+                  wsStatus === 'connecting' ? 'bg-amber-400 animate-pulse' :
                   'bg-slate-300'
                 }`} />
                 <span className="font-bold text-slate-700 tracking-wider">
-                  {wsStatus === 'connected' ? 'STREAM ACTIVE' : wsStatus === 'reconnecting' ? 'RECONNECTING...' : 'OFFLINE'}
+                  {wsStatus === 'connected' ? 'STREAM ACTIVE' :
+                   wsStatus === 'reconnecting' ? 'RECONNECTING...' :
+                   wsStatus === 'connecting' ? 'CONNECTING...' : 'OFFLINE'}
                 </span>
               </div>
             </div>
@@ -629,9 +632,12 @@ export default function BuyerDashboard() {
               </div>
               
               <div>
-                <label className="block text-xs uppercase font-bold font-mono tracking-wider text-slate-700 mb-2">
-                  Buyer Max Budget (₹/Unit)
-                </label>
+                <div className="flex justify-between items-baseline mb-2">
+                  <label className="block text-xs uppercase font-bold font-mono tracking-wider text-slate-700">
+                    Buyer Max Budget (₹/Unit)
+                  </label>
+                  <span className="text-[10px] font-mono text-slate-400">Ceiling Limit</span>
+                </div>
                 <input 
                   type="number" 
                   required 
@@ -641,6 +647,9 @@ export default function BuyerDashboard() {
                   className="w-full py-2.5 px-3.5 text-sm rounded-xl border border-slate-300 focus:border-black focus:ring-1 focus:ring-black font-mono text-[#000000]" 
                   placeholder={selectedItem ? `e.g. ${selectedItem.base_price}` : "e.g. 21000"}
                 />
+                <p className="text-[10px] text-slate-500 font-mono mt-1">
+                  AI negotiates starting at a discount and works upward without exceeding this ceiling.
+                </p>
               </div>
 
               <div className="md:col-span-3 pt-2">
@@ -677,6 +686,9 @@ export default function BuyerDashboard() {
                   {multiOffers.offers.map((offer: any) => {
                     const isBest = offer.transaction_id === multiOffers.best_offer_transaction_id;
                     const statusCfg = getDealStatusConfig(offer.status);
+                    const unitSavings = (budget && offer.final_price && budget > offer.final_price) 
+                      ? budget - offer.final_price 
+                      : 0;
 
                     return (
                       <div 
@@ -705,15 +717,23 @@ export default function BuyerDashboard() {
                           </span>
                         </div>
 
-                        <div className="my-4 py-3 border-y border-slate-100 font-mono">
-                          <div className="flex justify-between text-xs text-slate-500">
+                        <div className="my-4 py-3 border-y border-slate-100 font-mono space-y-1.5">
+                          <div className="flex justify-between items-center text-xs text-slate-500">
                             <span>Negotiated Unit Price:</span>
                             <span className="font-bold text-base text-[#000000]">
                               {offer.final_price ? `₹${offer.final_price.toLocaleString()}` : 'No Deal'}
                             </span>
                           </div>
+
+                          {unitSavings > 0 && (
+                            <div className="flex justify-between items-center text-[11px] text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md font-semibold">
+                              <span>Budget Savings:</span>
+                              <span>₹{unitSavings.toLocaleString()} / unit (save {(((unitSavings) / budget) * 100).toFixed(1)}%)</span>
+                            </div>
+                          )}
+
                           {offer.final_price && (
-                            <div className="flex justify-between text-xs text-slate-500 mt-1">
+                            <div className="flex justify-between text-xs text-slate-500 pt-0.5">
                               <span>Total ({quantity} units):</span>
                               <span className="font-semibold text-emerald-700">
                                 ₹{(offer.final_price * quantity).toLocaleString()}

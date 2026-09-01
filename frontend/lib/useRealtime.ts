@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { silentRefreshToken } from './api';
 
 export function getToken(): string | null {
   if (typeof window !== 'undefined') {
@@ -50,13 +51,14 @@ export function useTransactionRealtime(
   transactionId: number | null | undefined,
   { onEvent, onReconnect }: UseRealtimeOptions
 ) {
-  const [status, setStatus] = useState<ConnectionStatus>('disconnected');
+  const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef<number>(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const seenEventIdsRef = useRef<Set<string>>(new Set());
   const hasConnectedOnceRef = useRef<boolean>(false);
+  const isRefreshingRef = useRef<boolean>(false);
 
   // Stable callback refs
   const onEventRef = useRef(onEvent);
@@ -93,6 +95,7 @@ export function useTransactionRealtime(
       ws.onopen = () => {
         setStatus('connected');
         reconnectAttemptRef.current = 0;
+        isRefreshingRef.current = false;
 
         // If this is a reconnection, trigger database catch-up sync
         if (hasConnectedOnceRef.current && onReconnectRef.current) {
@@ -141,15 +144,33 @@ export function useTransactionRealtime(
       ws.onclose = (event) => {
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
 
-        // Do not reconnect if unauthorized or deliberately closed
-        if (event.code === 4401 || event.code === 4403 || event.code === 4404) {
+        // Handle 4401 (token expired) with automatic silent refresh
+        if (event.code === 4401 && !isRefreshingRef.current) {
+          isRefreshingRef.current = true;
+          setStatus('reconnecting');
+          silentRefreshToken().then((newToken) => {
+            isRefreshingRef.current = false;
+            if (newToken) {
+              reconnectAttemptRef.current = 0;
+              connect();
+            } else {
+              setStatus('disconnected');
+            }
+          }).catch(() => {
+            isRefreshingRef.current = false;
+            setStatus('disconnected');
+          });
+          return;
+        }
+
+        // Do not reconnect if unauthorized or resource forbidden/missing
+        if (event.code === 4403 || event.code === 4404) {
           console.warn(`WebSocket closed with non-recoverable code: ${event.code}`);
           setStatus('disconnected');
           return;
         }
 
-        // Skip the 'disconnected' flash — go straight to 'reconnecting'
-        // so the UI indicator doesn't flicker between states
+        // Seamless transition to 'reconnecting'
         setStatus('reconnecting');
 
         // Exponential backoff reconnect: 1s, 2s, 4s, up to 10s
@@ -170,7 +191,24 @@ export function useTransactionRealtime(
   useEffect(() => {
     connect();
 
+    const handleTokenRefresh = () => {
+      reconnectAttemptRef.current = 0;
+      connect();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('auth:token_refreshed', handleTokenRefresh);
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'token' && e.newValue) {
+          handleTokenRefresh();
+        }
+      });
+    }
+
     return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('auth:token_refreshed', handleTokenRefresh);
+      }
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (wsRef.current) {
@@ -189,13 +227,14 @@ export function useTransactionRealtime(
  * Hook for subscribing to live dashboard feeds (buyer or merchant overview).
  */
 export function useDashboardRealtime({ onEvent, onReconnect }: UseRealtimeOptions) {
-  const [status, setStatus] = useState<ConnectionStatus>('disconnected');
+  const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef<number>(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const seenEventIdsRef = useRef<Set<string>>(new Set());
   const hasConnectedOnceRef = useRef<boolean>(false);
+  const isRefreshingRef = useRef<boolean>(false);
 
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
@@ -230,6 +269,7 @@ export function useDashboardRealtime({ onEvent, onReconnect }: UseRealtimeOption
       ws.onopen = () => {
         setStatus('connected');
         reconnectAttemptRef.current = 0;
+        isRefreshingRef.current = false;
 
         if (hasConnectedOnceRef.current && onReconnectRef.current) {
           onReconnectRef.current();
@@ -268,12 +308,31 @@ export function useDashboardRealtime({ onEvent, onReconnect }: UseRealtimeOption
       ws.onclose = (event) => {
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
 
-        if (event.code === 4401 || event.code === 4403) {
+        // Handle 4401 (token expired) with automatic silent refresh
+        if (event.code === 4401 && !isRefreshingRef.current) {
+          isRefreshingRef.current = true;
+          setStatus('reconnecting');
+          silentRefreshToken().then((newToken) => {
+            isRefreshingRef.current = false;
+            if (newToken) {
+              reconnectAttemptRef.current = 0;
+              connect();
+            } else {
+              setStatus('disconnected');
+            }
+          }).catch(() => {
+            isRefreshingRef.current = false;
+            setStatus('disconnected');
+          });
+          return;
+        }
+
+        if (event.code === 4403) {
           setStatus('disconnected');
           return;
         }
 
-        // Skip the 'disconnected' flash — go straight to 'reconnecting'
+        // Seamless transition to 'reconnecting'
         setStatus('reconnecting');
 
         const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
@@ -293,7 +352,24 @@ export function useDashboardRealtime({ onEvent, onReconnect }: UseRealtimeOption
   useEffect(() => {
     connect();
 
+    const handleTokenRefresh = () => {
+      reconnectAttemptRef.current = 0;
+      connect();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('auth:token_refreshed', handleTokenRefresh);
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'token' && e.newValue) {
+          handleTokenRefresh();
+        }
+      });
+    }
+
     return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('auth:token_refreshed', handleTokenRefresh);
+      }
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (wsRef.current) {

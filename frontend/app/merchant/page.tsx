@@ -401,11 +401,14 @@ export default function MerchantDashboard() {
               >
                 <span className={`w-2 h-2 rounded-full motion-reduce:animate-none ${
                   wsStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
-                  wsStatus === 'reconnecting' || wsStatus === 'connecting' ? 'bg-amber-400 animate-ping' :
+                  wsStatus === 'reconnecting' ? 'bg-amber-400 animate-ping' :
+                  wsStatus === 'connecting' ? 'bg-amber-400 animate-pulse' :
                   'bg-slate-300'
                 }`} />
                 <span className="font-bold text-slate-700 tracking-wider">
-                  {wsStatus === 'connected' ? 'STREAM ACTIVE' : wsStatus === 'reconnecting' ? 'RECONNECTING...' : 'OFFLINE'}
+                  {wsStatus === 'connected' ? 'STREAM ACTIVE' :
+                   wsStatus === 'reconnecting' ? 'RECONNECTING...' :
+                   wsStatus === 'connecting' ? 'CONNECTING...' : 'OFFLINE'}
                 </span>
               </div>
             </div>

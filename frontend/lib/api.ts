@@ -24,7 +24,7 @@ export class ApiError extends Error {
 
 let refreshPromise: Promise<string | null> | null = null;
 
-async function silentRefreshToken(): Promise<string | null> {
+export async function silentRefreshToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
   const currentToken = localStorage.getItem('token');
   if (!currentToken) return null;
@@ -50,6 +50,9 @@ async function silentRefreshToken(): Promise<string | null> {
           localStorage.setItem('token', data.access_token);
           if (data.role) {
             localStorage.setItem('role', data.role);
+          }
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('auth:token_refreshed', { detail: { token: data.access_token } }));
           }
           return data.access_token;
         }
