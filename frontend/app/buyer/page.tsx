@@ -647,15 +647,18 @@ export default function BuyerDashboard() {
                 <button 
                   type="submit" 
                   disabled={negotiating || !selectedSku || (procureMode === 'targeted' && !selectedInventoryId)} 
-                  className="w-full py-3.5 bg-black hover:bg-black/85 text-white rounded-full font-bold font-mono text-xs uppercase tracking-wider transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed min-h-[46px]"
+                  className="w-full py-3.5 bg-black hover:bg-black/85 text-white rounded-full font-bold font-mono text-xs uppercase tracking-wider transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed min-h-[46px] flex items-center justify-center gap-2"
                 >
-                  {negotiating 
-                    ? 'Negotiation Agents Running In Real-Time...' 
-                    : !selectedSku 
-                      ? 'Select A Product Above To Begin'
-                      : (procureMode === 'targeted' 
-                          ? `Initiate Target Negotiation with Seller (${selectedItem?.name || selectedSku}) →` 
-                          : `Launch Parallel Multi-Merchant Auction for ${selectedSku} →`)}
+                  {negotiating ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                      <span>DISPATCHING MULTI-AGENT NEGOTIATION...</span>
+                    </>
+                  ) : (
+                    procureMode === 'targeted' 
+                      ? `DISPATCH TARGETED AI BID (₹${((budget || 0) * quantity).toLocaleString()} TOTAL)`
+                      : `DISPATCH PARALLEL MULTI-MERCHANT AUCTION`
+                  )}
                 </button>
               </div>
             </form>

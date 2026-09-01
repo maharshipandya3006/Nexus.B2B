@@ -100,13 +100,13 @@ export function useTransactionRealtime(
         }
         hasConnectedOnceRef.current = true;
 
-        // Start heartbeat ping
+        // Start aggressive 10s heartbeat ping to keep Render / Edge proxies permanently warm
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
         pingIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ action: 'ping' }));
           }
-        }, 25000);
+        }, 10000);
       };
 
       ws.onmessage = (event) => {
@@ -241,7 +241,7 @@ export function useDashboardRealtime({ onEvent, onReconnect }: UseRealtimeOption
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ action: 'ping' }));
           }
-        }, 25000);
+        }, 10000);
       };
 
       ws.onmessage = (event) => {

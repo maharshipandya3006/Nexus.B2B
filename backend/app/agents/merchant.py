@@ -23,7 +23,13 @@ def _clamp_price(counter: float, buyer_bid: float | None, merchant_floor: float,
 
 class MerchantAgent:
     def __init__(self):
-        self.llm = ChatGoogleGenerativeAI(model="gemini-3.6-flash", api_key=settings.GEMINI_API_KEY, temperature=0.2, max_retries=0) if settings.GEMINI_API_KEY else None
+        self.llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            api_key=settings.GEMINI_API_KEY,
+            temperature=0.2,
+            max_retries=0,
+            timeout=5.0
+        ) if settings.GEMINI_API_KEY else None
 
     def invoke(self, state: dict) -> dict:
         merchant_floor = state.get("merchant_floor_price", 0)

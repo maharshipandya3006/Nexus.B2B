@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 from typing import List, Optional
+import asyncio
 import logging
 import json
 from datetime import datetime
@@ -832,9 +833,18 @@ async def initiate_negotiation(
     db.commit()
     db.refresh(transaction)
 
-    # Run negotiation
-    orchestrator = NegotiationOrchestrator(db)
-    orchestrator.run_negotiation(transaction.id, req.buyer_max_budget)
+    # Run negotiation in non-blocking thread pool so event loop and WebSockets stay 100% active
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=db.get_bind())
+
+    def _run_single_orch(tx_id: int, budget: float):
+        local_db = session_factory()
+        try:
+            orch = NegotiationOrchestrator(local_db)
+            return orch.run_negotiation(tx_id, budget)
+        finally:
+            local_db.close()
+
+    await asyncio.to_thread(_run_single_orch, transaction.id, req.buyer_max_budget)
 
     db.refresh(transaction)
     await notify_transaction_event(transaction, realtime.EventType.NEGOTIATION_UPDATED)
@@ -860,7 +870,7 @@ async def initiate_multi_negotiation(
 ):
     """
     Parallel negotiation with ALL merchants offering this SKU.
-    Returns ranked offers for the buyer to compare and select.
+    Executes all merchant negotiations concurrently for sub-second responses.
     """
     if current_user.role != "buyer":
         raise HTTPException(status_code=403, detail="Only buyer users can initiate procurement bids.")
@@ -874,52 +884,77 @@ async def initiate_multi_negotiation(
     if not listings:
         raise HTTPException(status_code=404, detail=f"No merchants found offering SKU '{req.sku}' with available stock.")
 
-    offers = []
-    for item in listings:
-        # Create transaction for each merchant
-        transaction = models.Transaction(
-            sku=req.sku,
-            quantity=req.quantity,
-            buyer_id=current_user.id,
-            merchant_id=item.merchant_id,
-            inventory_id=item.id,
-            status=models.TransactionStatus.NEGOTIATING,
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=db.get_bind())
+
+    def _negotiate_single_listing(listing_id: int, buyer_user_id: int, sku: str, quantity: int, buyer_budget: float):
+        local_db = session_factory()
+        try:
+            item = local_db.query(models.Inventory).filter(models.Inventory.id == listing_id).first()
+            if not item:
+                return None
+
+            tx = models.Transaction(
+                sku=sku,
+                quantity=quantity,
+                buyer_id=buyer_user_id,
+                merchant_id=item.merchant_id,
+                inventory_id=item.id,
+                status=models.TransactionStatus.NEGOTIATING,
+            )
+            local_db.add(tx)
+            local_db.flush()
+            if not tx.transaction_number:
+                tx.transaction_number = f"NXS-{tx.id:04d}"
+            local_db.commit()
+            local_db.refresh(tx)
+
+            orch = NegotiationOrchestrator(local_db)
+            orch.run_negotiation(tx.id, buyer_budget)
+            local_db.refresh(tx)
+
+            profile = local_db.query(models.MerchantProfile).filter(
+                models.MerchantProfile.user_id == item.merchant_id
+            ).first()
+
+            logs = local_db.query(models.AuditLog).filter(
+                models.AuditLog.transaction_id == tx.id
+            ).order_by(models.AuditLog.timestamp.asc()).all()
+
+            return schemas.MerchantOfferResponse(
+                merchant_id=item.merchant_id,
+                merchant_name=profile.display_name if profile else item.wholesaler_name,
+                inventory_id=item.id,
+                transaction_id=tx.id,
+                transaction_number=tx.transaction_number or f"NXS-{tx.id:04d}",
+                status=tx.status,
+                final_price=tx.final_price,
+                available_stock=max(0, item.current_stock - item.reserved_stock),
+                logs=logs,
+            )
+        finally:
+            local_db.close()
+
+    # Execute all merchant negotiations concurrently in parallel threads
+    tasks = [
+        asyncio.to_thread(
+            _negotiate_single_listing,
+            item.id,
+            current_user.id,
+            req.sku,
+            req.quantity,
+            req.buyer_max_budget,
         )
-        db.add(transaction)
-        db.flush()
-        if not transaction.transaction_number:
-            transaction.transaction_number = f"NXS-{transaction.id:04d}"
-        db.commit()
-        db.refresh(transaction)
+        for item in listings
+    ]
+    raw_offers = await asyncio.gather(*tasks)
+    offers = [o for o in raw_offers if o is not None]
 
-        # Run negotiation
-        orchestrator = NegotiationOrchestrator(db)
-        orchestrator.run_negotiation(transaction.id, req.buyer_max_budget)
-        db.refresh(transaction)
-
-        await notify_transaction_event(transaction, realtime.EventType.NEGOTIATION_UPDATED)
-        await notify_transaction_event(transaction, realtime.EventType.TRANSACTION_STATUS_CHANGED)
-
-        # Get merchant display name
-        profile = db.query(models.MerchantProfile).filter(
-            models.MerchantProfile.user_id == item.merchant_id
-        ).first()
-
-        logs = db.query(models.AuditLog).filter(
-            models.AuditLog.transaction_id == transaction.id
-        ).order_by(models.AuditLog.timestamp.asc()).all()
-
-        offers.append(schemas.MerchantOfferResponse(
-            merchant_id=item.merchant_id,
-            merchant_name=profile.display_name if profile else item.wholesaler_name,
-            inventory_id=item.id,
-            transaction_id=transaction.id,
-            transaction_number=transaction.transaction_number or f"NXS-{transaction.id:04d}",
-            status=transaction.status,
-            final_price=transaction.final_price,
-            available_stock=max(0, item.current_stock - item.reserved_stock),
-            logs=logs,
-        ))
+    # Notify events for all generated transactions
+    for offer in offers:
+        tx = db.query(models.Transaction).filter(models.Transaction.id == offer.transaction_id).first()
+        if tx:
+            await notify_transaction_event(tx, realtime.EventType.NEGOTIATION_UPDATED)
+            await notify_transaction_event(tx, realtime.EventType.TRANSACTION_STATUS_CHANGED)
 
     # Find best offer (lowest agreed price)
     valid_agreed_states = (

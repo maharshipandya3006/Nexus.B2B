@@ -9,7 +9,13 @@ logger = logging.getLogger(__name__)
 
 class BuyerAgent:
     def __init__(self):
-        self.llm = ChatGoogleGenerativeAI(model="gemini-3.6-flash", api_key=settings.GEMINI_API_KEY, temperature=0.2, max_retries=0) if settings.GEMINI_API_KEY else None
+        self.llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            api_key=settings.GEMINI_API_KEY,
+            temperature=0.2,
+            max_retries=0,
+            timeout=5.0
+        ) if settings.GEMINI_API_KEY else None
 
     def invoke(self, state: dict) -> dict:
         current_turns = state.get("turns", 0) + 1
