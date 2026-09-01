@@ -38,6 +38,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+@app.get("/health")
+@app.get("/api/health")
+def health_check():
+    return {"status": "healthy", "service": "Nexus B2B API", "version": "1.0.0"}
+
+
 
 # =========================================================================
 # STARTUP: Seed DB with demo data (dynamic, merchant-as-data)
