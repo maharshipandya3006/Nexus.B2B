@@ -94,6 +94,11 @@ class AccountLockoutManager:
         with self._lock:
             self._records.pop(norm, None)
 
+    def clear_all(self):
+        """Clears all tracked lockout records (useful for test resets)."""
+        with self._lock:
+            self._records.clear()
+
     def _prune_stale(self, now: float):
         """Helper to evict old tracked items to prevent unbounded memory growth."""
         stale_keys = []

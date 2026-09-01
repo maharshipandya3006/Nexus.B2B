@@ -139,6 +139,8 @@ export interface Transaction {
   active_quote?: Quote | null;
   merchant_name?: string | null;
   item_name?: string | null;
+  merchant_minimum_price?: number | null;
+  catalog_price?: number | null;
   created_at: string;
   updated_at: string;
 }

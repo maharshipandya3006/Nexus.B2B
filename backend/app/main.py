@@ -834,7 +834,8 @@ async def initiate_negotiation(
     db.refresh(transaction)
 
     # Run negotiation in non-blocking thread pool so event loop and WebSockets stay 100% active
-    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=db.get_bind())
+    bind_engine = db.get_bind()
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=bind_engine)
 
     def _run_single_orch(tx_id: int, budget: float):
         local_db = session_factory()
@@ -844,7 +845,11 @@ async def initiate_negotiation(
         finally:
             local_db.close()
 
-    await asyncio.to_thread(_run_single_orch, transaction.id, req.buyer_max_budget)
+    is_sqlite_memory = (":memory:" in str(bind_engine.url))
+    if is_sqlite_memory:
+        _run_single_orch(transaction.id, req.buyer_max_budget)
+    else:
+        await asyncio.to_thread(_run_single_orch, transaction.id, req.buyer_max_budget)
 
     db.refresh(transaction)
     await notify_transaction_event(transaction, realtime.EventType.NEGOTIATION_UPDATED)
@@ -884,7 +889,8 @@ async def initiate_multi_negotiation(
     if not listings:
         raise HTTPException(status_code=404, detail=f"No merchants found offering SKU '{req.sku}' with available stock.")
 
-    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=db.get_bind())
+    bind_engine = db.get_bind()
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=bind_engine)
 
     def _negotiate_single_listing(listing_id: int, buyer_user_id: int, sku: str, quantity: int, buyer_budget: float):
         local_db = session_factory()
@@ -934,19 +940,23 @@ async def initiate_multi_negotiation(
         finally:
             local_db.close()
 
-    # Execute all merchant negotiations concurrently in parallel threads
-    tasks = [
-        asyncio.to_thread(
-            _negotiate_single_listing,
-            item.id,
-            current_user.id,
-            req.sku,
-            req.quantity,
-            req.buyer_max_budget,
-        )
-        for item in listings
-    ]
-    raw_offers = await asyncio.gather(*tasks)
+    # Execute all merchant negotiations concurrently in parallel threads (or safely serialized for in-memory SQLite)
+    is_sqlite_memory = (":memory:" in str(bind_engine.url))
+    if is_sqlite_memory:
+        raw_offers = [_negotiate_single_listing(item.id, current_user.id, req.sku, req.quantity, req.buyer_max_budget) for item in listings]
+    else:
+        tasks = [
+            asyncio.to_thread(
+                _negotiate_single_listing,
+                item.id,
+                current_user.id,
+                req.sku,
+                req.quantity,
+                req.buyer_max_budget,
+            )
+            for item in listings
+        ]
+        raw_offers = await asyncio.gather(*tasks)
     offers = [o for o in raw_offers if o is not None]
 
     # Notify events for all generated transactions
@@ -1811,6 +1821,8 @@ def format_transaction_response(tx: models.Transaction, db: Session) -> schemas.
         active_quote=active_quote,
         merchant_name=profile.display_name if profile else None,
         item_name=inventory.name if inventory else None,
+        merchant_minimum_price=inventory.minimum_margin_limit if inventory else None,
+        catalog_price=inventory.base_price if inventory else None,
         created_at=tx.created_at,
         updated_at=tx.updated_at,
     )

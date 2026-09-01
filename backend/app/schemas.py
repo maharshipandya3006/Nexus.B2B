@@ -216,6 +216,8 @@ class TransactionResponse(BaseModel):
     active_quote: Optional[QuoteResponse] = None
     merchant_name: Optional[str] = None  # From MerchantProfile
     item_name: Optional[str] = None  # From Inventory
+    merchant_minimum_price: Optional[float] = None  # Confidential merchant floor
+    catalog_price: Optional[float] = None  # Base catalog price
     created_at: datetime
     updated_at: datetime
 

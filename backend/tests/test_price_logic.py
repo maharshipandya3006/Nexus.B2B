@@ -55,7 +55,6 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 
 @pytest.fixture(scope="function")
 def db():
-    db_module.engine = test_engine
     Base.metadata.drop_all(bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
     session = TestingSessionLocal()
@@ -82,7 +81,6 @@ def db():
     session.add(profile)
     session.commit()
 
-    # Catalog listed at 65,000, floor at 50,000
     item = models.Inventory(
         sku="TEST-CHIP-65K",
         name="High-End Processor",
@@ -105,11 +103,7 @@ def db():
 @pytest.fixture(scope="function")
 def client(db):
     def override_get_db():
-        session = TestingSessionLocal()
-        try:
-            yield session
-        finally:
-            session.close()
+        yield db
 
     app.dependency_overrides[get_db] = override_get_db
     test_client = TestClient(app)

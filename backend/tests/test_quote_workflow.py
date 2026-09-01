@@ -9,19 +9,22 @@ from app.agents.merchant import MerchantAgent, _clamp_price
 from app.payment.service import PaymentService, payment_provider
 from app.agents.orchestrator import generate_cart_mandate
 
-# Test in-memory SQLite
+from sqlalchemy.pool import StaticPool
+import app.database as db_module
+
+# Test in-memory SQLite with StaticPool
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 @pytest.fixture
 def db():
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     session = TestingSessionLocal()
     yield session
     session.close()
-    Base.metadata.drop_all(bind=engine)
 
 
 def test_merchant_zone_strategy_above_buyer_bid():
@@ -391,3 +394,136 @@ def test_nine_state_lifecycle(db):
     )
     db.refresh(tx)
     assert tx.status in (models.TransactionStatus.COMPLETED, "paid")
+
+
+def test_merchant_submit_revised_quote_via_api_and_buyer_decision(db):
+    """
+    Full end-to-end API integration test:
+    1. Buyer initiates negotiation on inventory with base 4200, min 3600.
+    2. Buyer proposes sub-floor revised quote of 3500.
+    3. Merchant tries to propose 3500 -> rejected with 422 (below floor).
+    4. Merchant proposes valid revised quote of 3800 -> accepted & saved as PENDING.
+    5. Buyer accepts merchant's 3800 quote -> becomes MUTUALLY_APPROVED.
+    6. Verify final price is 3800 with active cart mandate.
+    """
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.database import get_db
+
+    def override_get_db():
+        yield db
+
+    app.dependency_overrides[get_db] = override_get_db
+    client = TestClient(app)
+
+    try:
+        # 1. Seed buyer, merchant, and inventory
+        from app import auth
+        buyer = models.User(username="rev_buyer", hashed_password=auth.get_password_hash("pw"), role="buyer")
+        merchant = models.User(username="rev_merch", hashed_password=auth.get_password_hash("pw"), role="merchant")
+        db.add_all([buyer, merchant])
+        db.commit()
+
+        profile = models.MerchantProfile(user_id=merchant.id, display_name="Pro SSD Wholesaler")
+        db.add(profile)
+        db.commit()
+
+        inv = models.Inventory(
+            sku="PROD-SSD-1TB",
+            name="Kingston NVMe 1TB SSD",
+            current_stock=100,
+            reserved_stock=0,
+            base_price=4200.0,
+            minimum_margin_limit=3600.0,
+            demand_velocity=1.0,
+            wholesaler_name="Pro SSD Wholesaler",
+            merchant_id=merchant.id,
+        )
+        db.add(inv)
+        db.commit()
+
+        # Login tokens
+        buyer_token = client.post("/api/auth/token", data={"username": "rev_buyer", "password": "pw"}).json()["access_token"]
+        merch_token = client.post("/api/auth/token", data={"username": "rev_merch", "password": "pw"}).json()["access_token"]
+        buyer_headers = {"Authorization": f"Bearer {buyer_token}"}
+        merch_headers = {"Authorization": f"Bearer {merch_token}"}
+
+        # Create transaction
+        tx = models.Transaction(
+            sku=inv.sku,
+            quantity=1,
+            final_price=3900.0,
+            status=models.TransactionStatus.QUOTE_AGREED,
+            buyer_id=buyer.id,
+            merchant_id=merchant.id,
+            inventory_id=inv.id,
+        )
+        db.add(tx)
+        db.commit()
+        db.refresh(tx)
+
+        # 2. Buyer proposes 3500 (below merchant floor of 3600)
+        buyer_quote_res = client.post(
+            f"/api/transactions/{tx.id}/quotes",
+            headers=buyer_headers,
+            json={"amount": 3500.0, "note": "Can you do 3500?"}
+        )
+        assert buyer_quote_res.status_code == 200
+        buyer_quote_id = buyer_quote_res.json()["id"]
+
+        # Verify transaction shows awaiting merchant approval
+        tx_detail = client.get(f"/api/transactions/{tx.id}", headers=merch_headers).json()
+        assert tx_detail["status"] == "awaiting_merchant_approval"
+        assert tx_detail["active_quote"]["id"] == buyer_quote_id
+        assert tx_detail["merchant_minimum_price"] == 3600.0
+
+        # 3. Merchant tries to accept 3500 -> blocked by floor check with 422
+        merch_accept_fail = client.post(
+            f"/api/transactions/{tx.id}/quotes/{buyer_quote_id}/accept",
+            headers=merch_headers
+        )
+        assert merch_accept_fail.status_code == 422
+
+        # 4. Merchant tries to propose 3500 -> blocked by floor check with 422
+        merch_propose_fail = client.post(
+            f"/api/transactions/{tx.id}/quotes",
+            headers=merch_headers,
+            json={"amount": 3500.0, "note": "Countering with 3500"}
+        )
+        assert merch_propose_fail.status_code == 422
+
+        # 5. Merchant proposes valid revised quote of 3750 -> SUCCESS
+        merch_quote_res = client.post(
+            f"/api/transactions/{tx.id}/quotes",
+            headers=merch_headers,
+            json={"amount": 3750.0, "note": "Best we can do is 3750"}
+        )
+        assert merch_quote_res.status_code == 200
+        merch_quote_data = merch_quote_res.json()
+        assert merch_quote_data["amount"] == 3750.0
+        assert merch_quote_data["proposed_by"] == "MERCHANT"
+        merch_quote_id = merch_quote_data["id"]
+
+        # Verify transaction now reflects merchant's proposal awaiting buyer approval
+        tx_detail = client.get(f"/api/transactions/{tx.id}", headers=buyer_headers).json()
+        assert tx_detail["status"] == "awaiting_buyer_approval"
+        assert tx_detail["active_quote"]["id"] == merch_quote_id
+        assert tx_detail["final_price"] == 3750.0
+
+        # 6. Buyer accepts the 3750 quote -> MUTUALLY_APPROVED
+        buyer_accept_res = client.post(
+            f"/api/transactions/{tx.id}/quotes/{merch_quote_id}/accept",
+            headers=buyer_headers
+        )
+        assert buyer_accept_res.status_code == 200
+        assert buyer_accept_res.json()["status"] == "accepted"
+
+        # 7. Verify final transaction state
+        final_tx = client.get(f"/api/transactions/{tx.id}", headers=buyer_headers).json()
+        assert final_tx["status"] == "mutually_approved"
+        assert final_tx["final_price"] == 3750.0
+        assert final_tx["buyer_approved"] == 1
+        assert final_tx["merchant_approved"] == 1
+        assert final_tx["cryptographic_signature"] is not None
+    finally:
+        app.dependency_overrides.clear()
