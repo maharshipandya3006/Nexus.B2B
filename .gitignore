@@ -1,4 +1,4 @@
-# macOS
+# macOS System Files
 .DS_Store
 .DS_Store?
 ._*
@@ -39,6 +39,10 @@ venv/
 ENV/
 env/
 .pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
 
 # Databases & Local State
 *.db
@@ -46,6 +50,8 @@ env/
 *.sqlite3
 nexus.db
 backend/nexus.db
+*.db-journal
+*.sqlite3-journal
 
 # Node.js & Next.js Build Artifacts
 node_modules/
@@ -79,3 +85,4 @@ backend/test_agent.py
 .impeccable/
 .vscode/
 .idea/
+.gemini/
