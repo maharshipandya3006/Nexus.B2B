@@ -1,0 +1,341 @@
+@import "tailwindcss";
+
+@theme {
+  /* Canonical Design Tokens from DESIGN.md */
+  --color-primary: #012652;
+  --color-accent-cobalt: #0D94FB;
+  --color-surface-canvas: #FFFFFF;
+  --color-surface-subtle: #f8fafc;
+  --color-border-subtle: #e2e8f0;
+  --color-status-success: #10B981;
+  --color-status-warning: #F59E0B;
+  --color-status-danger: #EF4444;
+  --color-status-payment: #6366F1;
+
+  /* Slush Design Tokens */
+  --color-carbon: #000000;
+  --color-paper-white: #ffffff;
+  --color-sky-wash: #dceeff;
+  --color-concrete-gray: #cccccc;
+  --color-soft-mist: #e9e9e9;
+  --color-electric-blue: #4da2ff;
+  --color-mint-pop: #55db9c;
+  --color-lavender: #e9ccff;
+  --color-ember: #fb4903;
+  --color-sunburst: #ffd731;
+  --color-voltage-violet: #5c4ade;
+
+  /* Legacy aliases for backwards compatibility */
+  --color-neon-blue: #0D94FB;
+  --color-neon-purple: #0D94FB;
+  --color-neon-pink: #012652;
+  --color-cyber-black: #FFFFFF;
+  --color-cyber-dark: #f8fafc;
+  --color-cyber-gray: #e2e8f0;
+  --color-cyber-light: #0D94FB;
+  --color-text-main: #012652;
+  --color-text-muted: #64748b;
+  
+  --font-sans: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  --background: var(--color-surface-canvas);
+  --foreground: var(--color-primary);
+  color-scheme: light;
+}
+
+::selection {
+  background-color: #0D94FB;
+  color: #FFFFFF;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Intentional reduced-motion alternative that preserves state feedback without looping pings */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
+  .animate-ping {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+  
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.1s !important;
+  }
+}
+
+/* Glassmorphism utilities - Light Corporate Theme */
+@layer utilities {
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(1, 38, 82, 0.1);
+    box-shadow: 0 4px 24px -4px rgba(1, 38, 82, 0.08);
+  }
+  
+  .glass-card {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 1) 0%, rgba(248, 250, 252, 1) 100%);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(1, 38, 82, 0.08);
+    border-top: 1px solid rgba(1, 38, 82, 0.12);
+    box-shadow: 0 4px 15px -2px rgba(1, 38, 82, 0.05);
+  }
+
+  .neon-text-blue {
+    color: var(--color-neon-blue);
+    text-shadow: none;
+  }
+  
+  .neon-text-purple {
+    color: var(--color-neon-blue);
+    text-shadow: none;
+  }
+
+  .neon-border-blue {
+    border-color: var(--color-neon-blue);
+    box-shadow: none;
+  }
+  
+  .neon-button {
+    position: relative;
+    background: var(--color-neon-blue);
+    color: #FFFFFF;
+    border: 1px solid var(--color-neon-blue);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(13, 148, 251, 0.2);
+    font-weight: 600;
+  }
+  
+  .neon-button:hover {
+    background: #0b7cd4;
+    box-shadow: 0 4px 12px rgba(13, 148, 251, 0.3);
+  }
+
+  .neon-button-purple {
+    position: relative;
+    background: transparent;
+    color: var(--color-text-main);
+    border: 1px solid var(--color-text-main);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    transition: all 0.3s ease;
+  }
+  
+  .neon-button-purple:hover {
+    background: rgba(1, 38, 82, 0.05);
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Base Inputs */
+input, select, textarea {
+  background: #FFFFFF;
+  border: 1px solid rgba(1, 38, 82, 0.2);
+  color: var(--color-primary);
+  caret-color: #0D94FB;
+  transition: all 0.2s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--color-neon-blue);
+  box-shadow: 0 0 0 2px rgba(13, 148, 251, 0.2);
+}
+
+/* Slush Marquee & Background Movement Animations */
+@keyframes slush-marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes slush-float {
+  0%, 100% { transform: translateY(0px) rotate(-6deg); }
+  50% { transform: translateY(-10px) rotate(-4deg); }
+}
+
+@keyframes slush-float-reverse {
+  0%, 100% { transform: translateY(0px) rotate(6deg); }
+  50% { transform: translateY(-9px) rotate(8deg); }
+}
+
+@keyframes slush-float-subtle {
+  0%, 100% { transform: translateY(0px) rotate(3deg); }
+  50% { transform: translateY(-7px) rotate(1deg); }
+}
+
+@keyframes slush-float-subtle-rev {
+  0%, 100% { transform: translateY(0px) rotate(-4deg); }
+  50% { transform: translateY(-8px) rotate(-2deg); }
+}
+
+@keyframes slush-orb-drift {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(35px, -25px) scale(1.06); }
+  66% { transform: translate(-25px, 20px) scale(0.96); }
+}
+
+@keyframes slush-orb-drift-reverse {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(-40px, 30px) scale(0.95); }
+  66% { transform: translate(30px, -25px) scale(1.05); }
+}
+
+@keyframes slush-stream {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-slush-marquee {
+  display: flex;
+  width: max-content;
+  animation: slush-marquee 28s linear infinite;
+}
+
+.animate-slush-float {
+  animation: slush-float 6s ease-in-out infinite;
+}
+
+.animate-slush-float-rev {
+  animation: slush-float-reverse 7s ease-in-out infinite;
+}
+
+.animate-slush-float-subtle {
+  animation: slush-float-subtle 8s ease-in-out infinite;
+}
+
+.animate-slush-float-subtle-rev {
+  animation: slush-float-subtle-rev 7.5s ease-in-out infinite;
+}
+
+.animate-slush-orb {
+  animation: slush-orb-drift 18s ease-in-out infinite;
+}
+
+.animate-slush-orb-reverse {
+  animation: slush-orb-drift-reverse 22s ease-in-out infinite;
+}
+
+.animate-slush-stream {
+  display: flex;
+  width: max-content;
+  animation: slush-stream 36s linear infinite;
+}
+
+/* Clean Precision Liquidity Mesh Animations */
+@keyframes mesh-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes mesh-ring-ping {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 0.15;
+  }
+}
+
+@keyframes mesh-packet-flow {
+  0% {
+    stroke-dashoffset: 240;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-mesh-pulse-1 {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mesh-pulse 3.6s ease-in-out infinite;
+}
+
+.animate-mesh-pulse-2 {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mesh-pulse 4.8s ease-in-out infinite 1.2s;
+}
+
+.animate-mesh-pulse-3 {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mesh-pulse 4.2s ease-in-out infinite 2.1s;
+}
+
+.animate-mesh-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mesh-ring-ping 4.5s ease-in-out infinite;
+}
+
+.animate-mesh-packet {
+  stroke-dasharray: 24 160;
+  animation: mesh-packet-flow 7s linear infinite;
+}
+
+.animate-mesh-packet-fast {
+  stroke-dasharray: 18 130;
+  animation: mesh-packet-flow 5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slush-marquee,
+  .animate-slush-float,
+  .animate-slush-float-rev,
+  .animate-slush-float-subtle,
+  .animate-slush-float-subtle-rev,
+  .animate-slush-orb,
+  .animate-slush-orb-reverse,
+  .animate-slush-stream,
+  .animate-mesh-pulse-1,
+  .animate-mesh-pulse-2,
+  .animate-mesh-pulse-3,
+  .animate-mesh-ring,
+  .animate-mesh-packet,
+  .animate-mesh-packet-fast {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+
