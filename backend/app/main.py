@@ -26,7 +26,13 @@ logger = logging.getLogger(__name__)
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title=settings.PROJECT_NAME)
+app = FastAPI(
+    title="Nexus B2B — Autonomous Multi-Agent Negotiation & Razorpay Settlement API",
+    description="Production B2B exchange engine powering parallel multi-agent LangGraph procurement, HMAC cart mandates, and Razorpay multi-merchant payment settlement.",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -43,7 +49,13 @@ app.add_middleware(
 @app.get("/health")
 @app.get("/api/health")
 def health_check():
-    return {"status": "healthy", "service": "Nexus B2B API", "version": "1.0.0"}
+    return {
+        "status": "healthy",
+        "service": "Nexus B2B Autonomous Negotiation & Settlement API",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat(),
+        "platform": "Razorpay Buildathon 2026",
+    }
 
 
 
