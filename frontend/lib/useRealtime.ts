@@ -25,19 +25,23 @@ interface UseRealtimeOptions {
 
 function getWebSocketBaseUrl(): string {
   // If NEXT_PUBLIC_API_URL is configured, derive ws URL from it
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  let apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').trim();
+  // Strip trailing /api or trailing slashes so base is clean protocol + host
+  apiUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/+$/, '');
+
   if (apiUrl.startsWith('https://')) {
     return apiUrl.replace('https://', 'wss://');
   } else if (apiUrl.startsWith('http://')) {
     return apiUrl.replace('http://', 'ws://');
   }
   // Fallback to current browser window host
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && window.location?.host) {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${window.location.host}`;
   }
   return 'ws://localhost:8000';
 }
+
 
 /**
  * Hook for subscribing to a transaction-specific real-time channel.

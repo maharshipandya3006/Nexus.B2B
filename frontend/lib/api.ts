@@ -1,4 +1,15 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+function getNormalizedApiUrl(): string {
+  let url = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').trim();
+  // Strip trailing slashes
+  url = url.replace(/\/+$/, '');
+  // If it does not end in /api, append it
+  if (!url.endsWith('/api')) {
+    url = `${url}/api`;
+  }
+  return url;
+}
+
+const API_URL = getNormalizedApiUrl();
 
 export class ApiError extends Error {
   status: number;

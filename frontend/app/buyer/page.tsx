@@ -115,6 +115,7 @@ export default function BuyerDashboard() {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       if (!token) {
+        setLoading(false);
         router.push('/auth');
         return;
       }
