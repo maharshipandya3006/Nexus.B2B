@@ -1,4 +1,4 @@
-# Nexus B2B — Autonomous Multi-Agent AI Negotiation & Razorpay Settlement Platform
+# Nexus B2B — Autonomous Multi Agent AI Negotiation & Razorpay Settlement Platform
 
 [![Production Deployment](https://img.shields.io/badge/Production-Live-emerald.svg)](https://nexus-b2b-xi.vercel.app)
 [![FastAPI Backend](https://img.shields.io/badge/Backend-Render-0055FF.svg)](https://nexus-b2b-backend.onrender.com)
@@ -10,7 +10,7 @@
 
 ---
 
-## 🌐 Live Production Deployments & Demo Access
+##  Live Production Deployments & Demo Access
 
 | Service | Environment URL | Description |
 | :--- | :--- | :--- |
@@ -18,7 +18,7 @@
 | **Backend REST & WS** | [https://nexus-b2b-backend.onrender.com](https://nexus-b2b-backend.onrender.com) | FastAPI, SQLAlchemy async ORM, LangGraph Agents, Razorpay Integration |
 | **Interactive API Docs** | [https://nexus-b2b-backend.onrender.com/docs](https://nexus-b2b-backend.onrender.com/docs) | OpenAPI 3.0 interactive Swagger UI |
 
-### 🔑 Pre-Configured Demo Credentials
+###  Pre-Configured Demo Credentials
 
 | Role | Username | Password | Purpose |
 | :--- | :--- | :--- | :--- |
@@ -27,7 +27,7 @@
 
 ---
 
-## ⚡ Key Innovations & Core Features
+## Key Innovations & Core Features
 
 ### 1. Autonomous Multi-Agent Negotiation (LangGraph + Gemini)
 - **Buyer Procurement Agent**: Concedes strategically along an algorithmic concession curve, bidding up from 75% of catalog value without ever exceeding the buyer's maximum budget ceiling.
@@ -48,7 +48,7 @@
 
 ---
 
-## 🏗️ Architecture & Component Layout
+##  Architecture & Component Layout
 
 ```
                                   ┌─────────────────────────────┐
@@ -92,7 +92,7 @@
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 ├── frontend/                  # Next.js 16 App Router Frontend
@@ -123,7 +123,7 @@
 
 ---
 
-## 🛠️ Local Development Setup
+## Local Development Setup
 
 ### Prerequisites
 - Node.js 18+ and npm
@@ -167,7 +167,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 🧪 Automated Testing Suite
+## Automated Testing Suite
 
 All 41 test cases pass with full test isolation across SQLite and PostgreSQL:
 
