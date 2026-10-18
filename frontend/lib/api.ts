@@ -149,16 +149,46 @@ export interface Transaction {
 }
 
 export const api = {
+  checkHealth: async (): Promise<boolean> => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const res = await fetch(`${API_URL}/health`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
   // Auth
   login: async (data: FormData) => {
-    const response = await fetch(`${API_URL}/auth/token`, {
-      method: 'POST',
-      body: data, // FastAPI OAuth2PasswordRequestForm expects form data
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${API_URL}/auth/token`, {
+        method: 'POST',
+        body: data, // FastAPI OAuth2PasswordRequestForm expects form data
+      });
+    } catch (networkErr: any) {
+      throw new ApiError(
+        0,
+        'Cannot reach backend server. If Render was idle, it may take 30–50 seconds to wake up. Please retry shortly.'
+      );
+    }
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new ApiError(response.status, errorData.detail || 'Login failed');
+      let errorDetail = 'Login failed';
+      try {
+        const errorData = await response.json();
+        errorDetail = errorData.detail || errorDetail;
+      } catch (parseErr) {
+        if (response.status === 502 || response.status === 503 || response.status === 504) {
+          errorDetail = 'Backend server is waking up from idle state. Please wait 15–30 seconds and click Sign In again.';
+        } else {
+          errorDetail = `Server returned status ${response.status} (${response.statusText || 'Error'})`;
+        }
+      }
+      throw new ApiError(response.status, errorDetail);
     }
     return response.json();
   },

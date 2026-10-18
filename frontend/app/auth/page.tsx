@@ -271,9 +271,38 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('buyer'); // Only used for registration
   const [loading, setLoading] = useState(false);
+  const [slowLoading, setSlowLoading] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'healthy' | 'sleeping'>('checking');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const router = useRouter();
+
+  // Monitor loading duration to inform users if backend is cold-starting
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (loading) {
+      timer = setTimeout(() => setSlowLoading(true), 3000);
+    } else {
+      setSlowLoading(false);
+    }
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  // Ping backend health on mount
+  useEffect(() => {
+    api.checkHealth().then((isHealthy) => {
+      setBackendStatus(isHealthy ? 'healthy' : 'sleeping');
+    });
+  }, []);
+
+  const fillDemo = (demoUser: string, demoPass: string, demoRole: 'buyer' | 'merchant') => {
+    setIsLogin(true);
+    setUsername(demoUser);
+    setPassword(demoPass);
+    setRole(demoRole);
+    setError('');
+    setSuccess('');
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -452,10 +481,62 @@ export default function AuthPage() {
         {/* Normal Proportional Nexus Terminal Box (max-w-md / 448px with clean balanced padding) */}
         <div className="w-full max-w-md bg-[#ffffff] border border-[#000000] rounded-2xl p-6 sm:p-8 relative z-10 shadow-lg">
           
-          <div className="text-center mb-6">
+          <div className="text-center mb-5">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight uppercase leading-tight text-[#000000]">
               Nexus Terminal
             </h1>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <span 
+                className={`inline-block w-2 h-2 rounded-full ${
+                  backendStatus === 'healthy' 
+                    ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]' 
+                    : backendStatus === 'checking' 
+                    ? 'bg-amber-400 animate-pulse' 
+                    : 'bg-amber-500'
+                }`} 
+              />
+              <span className="text-[11px] font-mono text-slate-500 font-semibold tracking-wide">
+                {backendStatus === 'healthy'
+                  ? 'Gateway: Online (Render Cloud)'
+                  : backendStatus === 'checking'
+                  ? 'Gateway: Connecting...'
+                  : 'Gateway: Idle (Wakes in ~30s)'}
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Demo Access Bar */}
+          <div className="mb-5 p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center justify-between">
+              <span>Quick Demo Identities</span>
+              <span className="text-[9px] font-mono text-slate-400">1-click fill</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() => fillDemo('retail_purchaser', 'retail_purchaser', 'buyer')}
+                className="px-2 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-[#0D94FB]/10 hover:border-[#0D94FB] text-slate-800 text-[11px] font-bold tracking-tight text-center transition-all truncate"
+                title="Buyer: retail_purchaser"
+              >
+                Buyer
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo('nexus_wholesaler', 'nexus_wholesaler', 'merchant')}
+                className="px-2 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-[#0D94FB]/10 hover:border-[#0D94FB] text-slate-800 text-[11px] font-bold tracking-tight text-center transition-all truncate"
+                title="Merchant A: nexus_wholesaler"
+              >
+                Merchant A
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo('apex_distributor', 'apex_distributor', 'merchant')}
+                className="px-2 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-[#0D94FB]/10 hover:border-[#0D94FB] text-slate-800 text-[11px] font-bold tracking-tight text-center transition-all truncate"
+                title="Merchant B: apex_distributor"
+              >
+                Merchant B
+              </button>
+            </div>
           </div>
 
           {/* Mode Switcher Pill */}
@@ -583,15 +664,28 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-5 rounded-full border border-[#000000] bg-[#000000] text-[#ffffff] font-bold text-xs sm:text-sm uppercase tracking-wider hover:bg-[#000000]/85 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#000000] transition-all disabled:opacity-50 mt-2 flex items-center justify-center gap-2 shadow-xs min-h-[46px]"
+              className="w-full py-3 px-5 rounded-full border border-[#000000] bg-[#000000] text-[#ffffff] font-bold text-xs sm:text-sm uppercase tracking-wider hover:bg-[#000000]/85 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#000000] transition-all disabled:opacity-50 mt-2 flex flex-col items-center justify-center gap-1 shadow-xs min-h-[48px]"
             >
               {loading ? (
-                <span>Authenticating Node...</span>
-              ) : (
                 <>
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Authenticating Node...
+                  </span>
+                  {slowLoading && (
+                    <span className="text-[10px] text-amber-300 font-mono normal-case tracking-normal">
+                      Server warming up (first request takes ~30s on Render free tier)...
+                    </span>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
                   <span>{isLogin ? 'Initialize Session' : 'Create Identity'}</span>
                   <span>→</span>
-                </>
+                </div>
               )}
             </button>
           </form>

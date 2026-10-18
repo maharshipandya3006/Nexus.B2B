@@ -272,13 +272,19 @@ export default function LandingPage() {
   const stagesRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    // If IntersectionObserver is unavailable, fallback immediately
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+      setStagesVisible(true);
+      return;
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setStagesVisible(true);
         }
       },
-      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+      { threshold: 0.05, rootMargin: '50px 0px 50px 0px' }
     );
 
     const currentEl = stagesRef.current;
@@ -286,8 +292,22 @@ export default function LandingPage() {
       observer.observe(currentEl);
     }
 
+    // Safety fallback: ensure cards animate in as soon as user scrolls near the section
+    const handleScroll = () => {
+      if (stagesRef.current) {
+        const rect = stagesRef.current.getBoundingClientRect();
+        if (rect.top < window.innerHeight * 0.95) {
+          setStagesVisible(true);
+        }
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    // Check initial position on mount
+    handleScroll();
+
     return () => {
       if (currentEl) observer.unobserve(currentEl);
+      window.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
