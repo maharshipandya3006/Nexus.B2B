@@ -272,7 +272,6 @@ export default function AuthPage() {
   const [role, setRole] = useState('buyer'); // Only used for registration
   const [loading, setLoading] = useState(false);
   const [slowLoading, setSlowLoading] = useState(false);
-  const [backendStatus, setBackendStatus] = useState<'checking' | 'healthy' | 'sleeping'>('checking');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const router = useRouter();
@@ -287,13 +286,6 @@ export default function AuthPage() {
     }
     return () => clearTimeout(timer);
   }, [loading]);
-
-  // Ping backend health on mount
-  useEffect(() => {
-    api.checkHealth().then((isHealthy) => {
-      setBackendStatus(isHealthy ? 'healthy' : 'sleeping');
-    });
-  }, []);
 
   const fillDemo = (demoUser: string, demoPass: string, demoRole: 'buyer' | 'merchant') => {
     setIsLogin(true);
@@ -481,28 +473,10 @@ export default function AuthPage() {
         {/* Normal Proportional Nexus Terminal Box (max-w-md / 448px with clean balanced padding) */}
         <div className="w-full max-w-md bg-[#ffffff] border border-[#000000] rounded-2xl p-6 sm:p-8 relative z-10 shadow-lg">
           
-          <div className="text-center mb-5">
+          <div className="text-center mb-6">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight uppercase leading-tight text-[#000000]">
               Nexus Terminal
             </h1>
-            <div className="flex items-center justify-center gap-2 mt-2">
-              <span 
-                className={`inline-block w-2 h-2 rounded-full ${
-                  backendStatus === 'healthy' 
-                    ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]' 
-                    : backendStatus === 'checking' 
-                    ? 'bg-amber-400 animate-pulse' 
-                    : 'bg-amber-500'
-                }`} 
-              />
-              <span className="text-[11px] font-mono text-slate-500 font-semibold tracking-wide">
-                {backendStatus === 'healthy'
-                  ? 'Gateway: Online (Render Cloud)'
-                  : backendStatus === 'checking'
-                  ? 'Gateway: Connecting...'
-                  : 'Gateway: Idle (Wakes in ~30s)'}
-              </span>
-            </div>
           </div>
 
           {/* Quick Demo Access Bar */}
